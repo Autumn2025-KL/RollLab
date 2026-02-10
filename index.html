@@ -249,6 +249,7 @@ function startTimer(){
 
 /* ================= NEXT ROUND ================= */
 function nextRound(){
+
   gameState.selected = [];
   gameState.target = generateTargetByGroup();
 
@@ -262,19 +263,21 @@ function nextRound(){
 
     <p><strong>Required ingredients (1 from each group):</strong></p>
 
-
     <ul>
-      ${gameState.target.map(i=>`<li>${getMaterialName(i)}</li>`).join("")}
+      ${gameState.target.map(i =>
+        `<li>${getMaterialName(i)}</li>`
+      ).join("")}
     </ul>
-<p id="feedback" style="
-  min-height:20px;
-  margin:6px 0 10px;
-  font-weight:600;
-  color:#c00;
-"></p>
 
+    <p id="feedback" style="
+      min-height:20px;
+      margin:6px 0 10px;
+      font-weight:600;
+      color:#c00;
+    "></p>
 
     ${renderGameGrid()}
+
     <button onclick="checkAnswer(this)">Confirm</button>
   `;
 }
@@ -306,11 +309,13 @@ function toggleSelect(img, el){
 }
 
 /* ================= CHECK ANSWER ================= */
-
 function checkAnswer(btn){
 
   // Disable button instantly to prevent double tap
-  if(btn) btn.disabled = true;
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = "Checking...";
+  }
 
   const correct =
     gameState.target.every(i => gameState.selected.includes(i)) &&
@@ -324,9 +329,12 @@ function checkAnswer(btn){
       feedback.textContent = "❌ Wrong ingredients. Try again!";
     }
 
-    // Re-enable button shortly
+    // Re-enable button and restore text
     if(btn){
-      setTimeout(() => btn.disabled = false, 150);
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = "Confirm";
+      }, 150);
     }
     return;
   }
@@ -338,7 +346,6 @@ function checkAnswer(btn){
 
   gameState.nem++;
 
-  // Smooth transition
   setTimeout(() => {
     if(gameState.nem >= 5){
       winGame();
