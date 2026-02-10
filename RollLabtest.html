@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>RollLab – Play what you eat</title>
+
+<style>
+body,html{
+  margin:0;
+  padding:0;
+  height:100%;
+  font-family:Arial;
+  background:#f4f4f4;
+}
+#app{
+  height:100%;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+.screen{
+  width:100%;
+  max-width:420px;
+  height:100%;
+  background:#ffffff;
+  padding:20px;
+  box-sizing:border-box;
+  text-align:center;
+  overflow-y:auto;
+}
+button{
+  padding:12px;
+  margin:10px 0;
+  border:none;
+  border-radius:8px;
+  background:#111;
+  color:#fff;
+  font-weight:bold;
+  width:100%;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  margin-bottom:10px;
+}
+.choice-img{
+  width:100%;
+  border-radius:10px;
+  border:2px solid transparent;
+  cursor:pointer;
+  background:#fff;
+}
+.choice-img.selected{
+  border-color:#111;
+}
+input,textarea{
+  width:100%;
+  padding:10px;
+  margin:8px 0;
+}
+.note{
+  font-size:12px;
+  opacity:.7;
+}
+
+/* ===== MATERIAL NAME UNDER IMAGE ===== */
+.item{
+  text-align:center;
+  font-size:12px;
+}
+
+.item-name{
+  margin-top:4px;
+  color:#333;
+}
+
+/* Bigger text on mobile */
+@media (max-width:480px){
+  .item-name{
+    font-size:14px;
+    font-weight:600;
+  }
+}
+
+/* ===== COMPACT ORDER SUMMARY ===== */
+.order-summary {
+  font-size: 13px;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+
+.order-summary p {
+  margin: 2px 0;
+}
+
+.order-summary ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.order-summary li {
+  margin: 2px 0;
+}
+
+</style>
+</head>
+
+<body>
+<div id="app">
+  <div class="screen" id="game"></div>
+</div>
+
+
+<script>
+/* ================= ORIGINAL VERSION 1 DATA ================= */
+
+let pendingOrder = null;
+const groups = {
+  wrapper: ["Wrapper-ram.png","Wrapper-bopia.png","Wrapper-ricepaper.png"],
+  protein: ["Chicken.png","Pork.png","Oyster-mushroom.png"],
+  noodle: ["Instant-noodle.png","Rice-noodle.png","Glass-noodle.png"],
+  vegetable: ["Ear-mushroom.png","Carrot.png","Taro.png"],
+  others: ["Egg.png","Flour.png","Pepper.png"]
+};
+
+let choice = {
+  wrapper:null,
+  protein:null,
+  noodle:null,
+  vegetable:null,
+  others:[]
+};
+
+const game = document.getElementById("game");
+
+function getMaterialName(filename){
+  return filename
+    .replace(".png","")
+    .replace(/-/g," ")
+    .replace(/([A-Z])/g," $1")
+    .trim();
+}
+
+function getNemImageByWrapper(wrapperImg){
+  if(wrapperImg === "Wrapper-ram.png") return "Nem-ram.png";
+  if(wrapperImg === "Wrapper-bopia.png") return "Nem-bopia.png";
+  if(wrapperImg === "Wrapper-ricepaper.png") return "Nem-ricepaper.png";
+  return "";
+}
+
+
+/* ================= LANDING (SAFE) ================= */
+function landing(){
+  game.innerHTML = `
+    <h1>🧪 RollLab</h1>
+    <p>Play what you eat</p>
+    <img src="images/table-hero.png" width="100%">
+    <button onclick="showIntro()">What is Nem Rán?</button>
+    <button onclick="startGame()">Start</button>
+  `;
+}
+
+/* ================= INTRO (VERSION 3, SAFE) ================= */
+function showIntro(){
+  game.innerHTML = `
+    <h2>How to make Nem</h2>
+
+    <img 
+      src="images/how-to-make-nem.png"
+      alt="Nem Ran Introduction"
+      style="
+        width:100%;
+        max-width:320px;
+        margin:12px auto;
+        display:block;
+        border-radius:12px;
+      "
+    >
+
+    <p>
+      Nem rán is a Vietnamese traditional fried roll made from wrapper,
+      meat, vegetables, noodles, and egg.
+    </p>
+
+    <button onclick="startGame()">Make Your Nem</button>
+  `;
+}
+
+
+/* ================= GAME STATE ================= */
+let gameState = {
+  time: 60,
+  nem: 0,
+  target: [],
+  selected: [],
+  timer: null
+};
+
+const ingredientPool = [
+  ...groups.wrapper,
+  ...groups.protein,
+  ...groups.noodle,
+  ...groups.vegetable,
+  ...groups.others
+];
+
+
+/* ================= START GAME ================= */
+function startGame(){
+  gameState.time = 60;
+  gameState.nem = 0;
+  clearInterval(gameState.timer);
+  startTimer();
+  nextRound();
+}
+
+/* ================= TIMER ================= */
+function startTimer(){
+  gameState.timer = setInterval(()=>{
+    gameState.time--;
+    const t = document.getElementById("time");
+    if(t) t.innerText = gameState.time;
+
+    if(gameState.time <= 0){
+      clearInterval(gameState.timer);
+      gameOver();
+    }
+  },1000);
+}
+
+/* ================= NEXT ROUND ================= */
+function nextRound(){
+  gameState.selected = [];
+  gameState.target = generateTargetByGroup();
+
+  game.innerHTML = `
+    <div style="display:flex;justify-content:space-between">
+      <div>⏱ <span id="time">${gameState.time}</span>s</div>
+      <div>🥢 ${gameState.nem}/5</div>
+    </div>
+
+    <h2>Make Nem ${gameState.nem + 1}</h2>
+
+    <p><strong>Required ingredients (1 from each group):</strong></p>
+
+
+    <ul>
+      ${gameState.target.map(i=>`<li>${getMaterialName(i)}</li>`).join("")}
+    </ul>
+
+    ${renderGameGrid()}
+    <button onclick="checkAnswer()">Confirm</button>
+  `;
+}
+
+/* ================= GAME GRID ================= */
+function renderGameGrid(){
+  return `
+    <div class="grid">
+      ${ingredientPool.map(img=>`
+        <div class="item">
+          <img src="images/${img}"
+               class="choice-img"
+               onclick="toggleSelect('${img}',this)">
+          <div class="item-name">${getMaterialName(img)}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function toggleSelect(img,el){
+  if(gameState.selected.includes(img)){
+    gameState.selected = gameState.selected.filter(i=>i!==img);
+    el.classList.remove("selected");
+  }else{
+    gameState.selected.push(img);
+    el.classList.add("selected");
+  }
+}
+
+/* ================= CHECK ANSWER ================= */
+function checkAnswer(){
+  const correct =
+    gameState.target.every(i=>gameState.selected.includes(i)) &&
+    gameState.selected.length === gameState.target.length;
+
+  if(!correct){
+    alert("❌ Wrong ingredients. Try again!");
+    return;
+  }
+
+  gameState.nem++;
+
+  if(gameState.nem >= 5){
+    winGame();
+  }else{
+    nextRound();
+  }
+}
+
+/* ================= GAME END ================= */
+function winGame(){
+  clearInterval(gameState.timer);
+  game.innerHTML = `
+    <h2>🎉 Great job!</h2>
+    <p>You completed 5 Nem in time.</p>
+    <p>Do you want to build your real Nem ?</p>
+
+    <button onclick="buildNem()">🍽 Build Your Real Nem</button>
+  `;
+}
+
+function gameOver(){
+  game.innerHTML = `
+    <h2>⏰ Time’s up!</h2>
+    <p>You completed ${gameState.nem} / 5 Nem</p>
+
+    <button onclick="buildNem()">🍽 Build Real Nem</button>
+    <button onclick="startGame()">Try Again</button>
+  `;
+}
+
+/* ================= HELPER ================= */
+function randomPick(arr,n){
+  return [...arr].sort(()=>0.5-Math.random()).slice(0,n);
+}
+
+function generateTargetByGroup(){
+  const pickOne = arr => arr[Math.floor(Math.random() * arr.length)];
+
+  return [
+    pickOne(groups.wrapper),
+    pickOne(groups.protein),
+    pickOne(groups.noodle),
+    pickOne(groups.vegetable),
+    pickOne(groups.others)
+  ];
+}
+
+
+/* ================= VERSION 1 BUILD NEM (UNCHANGED) ================= */
+function buildNem(){
+  game.innerHTML=`
+    <h2>Choose Wrapper</h2>
+    ${renderSingle("wrapper")}
+
+    <h2>Protein</h2>
+    ${renderSingle("protein")}
+
+    <h2>Noodle</h2>
+    ${renderSingle("noodle")}
+
+    <h2>Vegetable</h2>
+    ${renderSingle("vegetable")}
+
+    <h2>Others</h2>
+    <p class="note">Choose up to 2</p>
+    ${renderOthers()}
+
+    <button onclick="placeOrder()">Confirm Nem</button>
+  `;
+}
+
+/* ================= RENDER ================= */
+function renderSingle(group){
+  return `
+    <div class="grid">
+      ${groups[group].map(img=>`
+        <div class="item">
+          <img src="images/${img}"
+               class="choice-img"
+               onclick="selectSingle('${group}','${img}',this)">
+          <div class="item-name">${getMaterialName(img)}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+
+function renderOthers(){
+  return `
+    <div class="grid">
+      ${groups.others.map(img=>`
+        <div class="item">
+          <img src="images/${img}"
+               class="choice-img"
+               onclick="selectOther('${img}',this)">
+          <div class="item-name">${getMaterialName(img)}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+/* ================= SELECTION LOGIC ================= */
+function selectSingle(group,img,el){
+  choice[group]=img;
+  document.querySelectorAll(".choice-img").forEach(i=>{
+    if(i.onclick && i.onclick.toString().includes(group)){
+      i.classList.remove("selected");
+    }
+  });
+  el.classList.add("selected");
+}
+
+function selectOther(img,el){
+  if(choice.others.includes(img)){
+    choice.others = choice.others.filter(i=>i!==img);
+    el.classList.remove("selected");
+    return;
+  }
+  if(choice.others.length>=2){
+    alert("You can choose up to 2 items only");
+    return;
+  }
+  choice.others.push(img);
+  el.classList.add("selected");
+}
+
+function submitOrder(){
+  const name = document.getElementById("order-name").value.trim();
+  const phone = document.getElementById("order-phone").value.trim();
+  const address = document.getElementById("order-address").value.trim();
+  const quantity = Number(document.getElementById("order-qty").value);
+
+  if(!name || !phone || !address){
+    alert("Please fill in all information");
+    return;
+  }
+
+  if(quantity < 10){
+    alert("Minimum order is 10 Nem rán");
+    return;
+  }
+
+  pendingOrder = {
+    name,
+    phone,
+    address,
+    quantity,
+    wrapper: getMaterialName(choice.wrapper),
+    ingredients: [
+      choice.protein,
+      choice.noodle,
+      choice.vegetable,
+      ...choice.others
+    ].map(getMaterialName)
+  };
+
+  showOrderSummary();
+}
+
+function showOrderSummary(){
+  const o = pendingOrder;
+
+  game.innerHTML = `
+   <div class="order-summary">
+  <h2>🧾 Order Summary</h2>
+
+  <p><strong>Name:</strong> ${o.name}</p>
+  <p><strong>Phone:</strong> ${o.phone}</p>
+  <p><strong>Address:</strong> ${o.address}</p>
+  <p><strong>Quantity:</strong> ${o.quantity} Nem rán</p>
+
+  <hr>
+
+  <p><strong>Wrapper:</strong> ${o.wrapper}</p>
+  <p><strong>Ingredients:</strong></p>
+  <ul>
+    ${o.ingredients.map(i => `<li>${i}</li>`).join("")}
+  </ul>
+</div>
+
+    <hr>
+
+    <div style="
+  margin:12px 0 18px;
+  text-align:center;
+">
+  <img
+    src="images/order-guide.png"
+    alt="Screenshot & WhatsApp Guide"
+    style="
+      width:100%;
+      max-width:380px;
+      display:block;
+      margin:0 auto;
+      border-radius:18px;
+      box-shadow:0 10px 26px rgba(0,0,0,.15);
+    "
+  >
+</div>
+
+    <button onclick="contactViaWhatsApp()">📲 Contact via WhatsApp</button>
+    <button onclick="placeOrder()">✏️ Edit Order</button>
+  `;
+}
+
+function confirmOrder(){
+  game.innerHTML = `
+    <h2>✅ Order Confirmed</h2>
+    <p>Thank you! Your Nem rán order has been received.</p>
+
+    <p><strong>We will contact you shortly.</strong></p>
+
+    <button onclick="landing()">Back to Start</button>
+  `;
+};
+
+
+/* ================= CONFIRM ================= */
+function placeOrder(){
+  game.innerHTML = `
+    <h2>📝 Order Your Nem Rán</h2>
+
+    <input id="order-name" placeholder="Full name">
+    <input id="order-phone" placeholder="Phone number">
+    <textarea id="order-address" placeholder="Delivery address"></textarea>
+    <input id="order-qty" type="number" min="10" placeholder="Quantity (min 10)">
+
+    <button onclick="submitOrder()">Place Order</button>
+  `;
+}
+
+function contactViaWhatsApp(){
+  const o = pendingOrder;
+
+  const message = `
+🧪 RollLab – Nem Rán Order
+
+👤 Name: ${o.name}
+📞 Phone: ${o.phone}
+📍 Address: ${o.address}
+
+🍽 Order:
+• Quantity: ${o.quantity}
+• Wrapper: ${o.wrapper}
+• Ingredients: ${o.ingredients.join(", ")}
+
+📸 I have attached the screenshot of my order.
+`;
+
+  const phoneNumber = "60168535693"; 
+
+
+  const url =
+    "https://wa.me/" +
+    phoneNumber +
+    "?text=" +
+    encodeURIComponent(message);
+
+  window.open(url, "_blank");
+}
+
+/* ================= START ================= */
+landing();
+
+</script> 
+
+</body>
+</html>
