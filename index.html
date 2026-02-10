@@ -103,6 +103,17 @@ input,textarea{
   margin: 2px 0;
 }
 
+/* ===== FAST TOUCH RESPONSE ===== */
+button {
+  touch-action: manipulation;
+}
+
+/* Instant visual feedback */
+button:active {
+  transform: scale(0.96);
+  opacity: 0.85;
+}
+
 </style>
 
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
@@ -255,9 +266,16 @@ function nextRound(){
     <ul>
       ${gameState.target.map(i=>`<li>${getMaterialName(i)}</li>`).join("")}
     </ul>
+<p id="feedback" style="
+  min-height:20px;
+  margin:6px 0 10px;
+  font-weight:600;
+  color:#c00;
+"></p>
+
 
     ${renderGameGrid()}
-    <button onclick="checkAnswer()">Confirm</button>
+    <button onclick="checkAnswer(this)">Confirm</button>
   `;
 }
 
@@ -277,35 +295,59 @@ function renderGameGrid(){
   `;
 }
 
-function toggleSelect(img,el){
+function toggleSelect(img, el){
   if(gameState.selected.includes(img)){
-    gameState.selected = gameState.selected.filter(i=>i!==img);
+    gameState.selected = gameState.selected.filter(i => i !== img);
     el.classList.remove("selected");
-  }else{
+  } else {
     gameState.selected.push(img);
     el.classList.add("selected");
   }
 }
 
 /* ================= CHECK ANSWER ================= */
-function checkAnswer(){
+
+function checkAnswer(btn){
+
+  // Disable button instantly to prevent double tap
+  if(btn) btn.disabled = true;
+
   const correct =
-    gameState.target.every(i=>gameState.selected.includes(i)) &&
+    gameState.target.every(i => gameState.selected.includes(i)) &&
     gameState.selected.length === gameState.target.length;
 
+  const feedback = document.getElementById("feedback");
+
+  // ❌ WRONG ANSWER
   if(!correct){
-    alert("❌ Wrong ingredients. Try again!");
+    if(feedback){
+      feedback.textContent = "❌ Wrong ingredients. Try again!";
+    }
+
+    // Re-enable button shortly
+    if(btn){
+      setTimeout(() => btn.disabled = false, 150);
+    }
     return;
+  }
+
+  // ✅ CORRECT ANSWER
+  if(feedback){
+    feedback.textContent = "";
   }
 
   gameState.nem++;
 
-  if(gameState.nem >= 5){
-    winGame();
-  }else{
-    nextRound();
-  }
+  // Smooth transition
+  setTimeout(() => {
+    if(gameState.nem >= 5){
+      winGame();
+    }else{
+      nextRound();
+    }
+  }, 120);
 }
+
 
 /* ================= GAME END ================= */
 function winGame(){
