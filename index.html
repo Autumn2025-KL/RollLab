@@ -5,119 +5,106 @@
 <title>RollLab – Play what you eat</title>
 
 <style>
-body,html{
-  margin:0;
-  padding:0;
-  height:100%;
-  font-family:Arial;
-  background:#f4f4f4;
-}
-#app{
-  height:100%;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-}
-.screen{
-  width:100%;
-  max-width:420px;
-  height:100%;
-  background:#ffffff;
-  padding:20px;
-  box-sizing:border-box;
-  text-align:center;
-  overflow-y:auto;
-}
-button{
-  padding:12px;
-  margin:10px 0;
-  border:none;
-  border-radius:8px;
-  background:#111;
-  color:#fff;
-  font-weight:bold;
-  width:100%;
-}
-.grid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
-  margin-bottom:10px;
-}
-.choice-img{
-  width:100%;
-  border-radius:10px;
-  border:2px solid transparent;
-  cursor:pointer;
-  background:#fff;
-}
-.choice-img.selected{
-  border-color:#111;
-}
-input,textarea{
-  width:100%;
-  padding:10px;
-  margin:8px 0;
-}
-.note{
-  font-size:12px;
-  opacity:.7;
-}
-
-/* ===== MATERIAL NAME UNDER IMAGE ===== */
-.item{
-  text-align:center;
-  font-size:12px;
-}
-
-.item-name{
-  margin-top:4px;
-  color:#333;
-}
-
-/* Bigger text on mobile */
-@media (max-width:480px){
-  .item-name{
-    font-size:14px;
-    font-weight:600;
+  body,html{
+    margin:0;
+    padding:0;
+    height:100%;
+    font-family:Arial, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background:#f4f4f4;
   }
-}
+  #app{
+    height:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+  }
+  .screen{
+    width:100%;
+    max-width:420px;
+    height:100%;
+    background:#ffffff;
+    padding:20px;
+    box-sizing:border-box;
+    text-align:center;
+    overflow-y:auto;
+    -webkit-overflow-scrolling: touch;
+  }
 
-/* ===== COMPACT ORDER SUMMARY ===== */
-.order-summary {
-  font-size: 13px;
-  line-height: 1.35;
-  margin-bottom: 10px;
-}
+  button{
+    padding:12px;
+    margin:10px 0;
+    border:none;
+    border-radius:8px;
+    background:#111;
+    color:#fff;
+    font-weight:bold;
+    width:100%;
+    touch-action: manipulation;
+  }
+  button:active{
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
 
-.order-summary p {
-  margin: 2px 0;
-}
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-bottom:10px;
+  }
 
-.order-summary ul {
-  margin: 4px 0;
-  padding-left: 18px;
-}
+  .item{
+    text-align:center;
+    font-size:12px;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+  .choice-img{
+    width:100%;
+    border-radius:10px;
+    border:2px solid transparent;
+    cursor:pointer;
+    background:#fff;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    display:block;
+  }
+  .choice-img.selected{ border-color:#111; }
+  .choice-img.locked{ pointer-events:none; opacity:0.85; }
 
-.order-summary li {
-  margin: 2px 0;
-}
+  .item-name{ margin-top:4px; color:#333; }
+  @media (max-width:480px){
+    .item-name{ font-size:14px; font-weight:600; }
+  }
 
-/* ===== FAST TOUCH RESPONSE ===== */
-button {
-  touch-action: manipulation;
-}
+  input,textarea{
+    width:100%;
+    padding:10px;
+    margin:8px 0;
+    box-sizing:border-box;
+  }
+  .note{ font-size:12px; opacity:.7; }
 
-/* Instant visual feedback */
-button:active {
-  transform: scale(0.96);
-  opacity: 0.85;
-}
+  .order-summary {
+    font-size: 13px;
+    line-height: 1.35;
+    margin-bottom: 10px;
+    text-align:left;
+  }
+  .order-summary p{ margin: 2px 0; }
+  .order-summary ul{ margin: 4px 0; padding-left: 18px; }
+  .order-summary li{ margin: 2px 0; }
 
+  #feedback{
+    min-height:22px;
+    margin:6px 0 10px;
+    font-weight:700;
+  }
+  #feedback.ok{ color:#0a7a2f; }
+  #feedback.bad{ color:#c00; }
 </style>
 
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-
 </head>
 
 <body>
@@ -128,480 +115,518 @@ button:active {
 <audio id="bg-music" loop>
   <source src="audio/bg-music.mp3" type="audio/mpeg">
 </audio>
+
 <script>
-/* ================= ORIGINAL VERSION 1 DATA ================= */
+  /* ================= DATA ================= */
+  let pendingOrder = null;
 
-let pendingOrder = null;
-const groups = {
-  wrapper: ["Wrapper-ram.png","Wrapper-bopia.png","Wrapper-ricepaper.png"],
-  protein: ["Chicken.png","Pork.png","Oyster-mushroom.png"],
-  noodle: ["Instant-noodle.png","Rice-noodle.png","Glass-noodle.png"],
-  vegetable: ["Ear-mushroom.png","Carrot.png","Taro.png"],
-  others: ["Egg.png","Flour.png","Pepper.png"]
-};
+  const groups = {
+    wrapper: ["Wrapper-ram.png","Wrapper-bopia.png","Wrapper-ricepaper.png"],
+    protein: ["Chicken.png","Pork.png","Oyster-mushroom.png"],
+    noodle: ["Instant-noodle.png","Rice-noodle.png","Glass-noodle.png"],
+    vegetable: ["Ear-mushroom.png","Carrot.png","Taro.png"],
+    others: ["Egg.png","Flour.png","Pepper.png"]
+  };
 
-let choice = {
-  wrapper:null,
-  protein:null,
-  noodle:null,
-  vegetable:null,
-  others:[]
-};
+  let choice = {
+    wrapper:null,
+    protein:null,
+    noodle:null,
+    vegetable:null,
+    others:[]
+  };
 
-const game = document.getElementById("game");
+  const game = document.getElementById("game");
 
-function getMaterialName(filename){
-  return filename
-    .replace(".png","")
-    .replace(/-/g," ")
-    .replace(/([A-Z])/g," $1")
-    .trim();
-}
-
-function getNemImageByWrapper(wrapperImg){
-  if(wrapperImg === "Wrapper-ram.png") return "Nem-ram.png";
-  if(wrapperImg === "Wrapper-bopia.png") return "Nem-bopia.png";
-  if(wrapperImg === "Wrapper-ricepaper.png") return "Nem-ricepaper.png";
-  return "";
-}
-
-
-/* ================= LANDING (SAFE) ================= */
-function landing(){
-  game.innerHTML = `
-    <h1>🧪 RollLab</h1>
-    <p>Play what you eat</p>
-    <img src="images/table-hero.png" width="100%">
-
-    <button onclick="showIntro()">What is Nem Rán?</button>
-    <button onclick="startIntroMusic()">Start</button>
-  `;
-}
-
-/* ================= INTRO (VERSION 3, SAFE) ================= */
-function showIntro(){
-  game.innerHTML = `
-    <h2>How to make Nem</h2>
-
-    <img 
-      src="images/how-to-make-nem.png"
-      alt="Nem Ran Introduction"
-      style="
-        width:100%;
-        max-width:320px;
-        margin:12px auto;
-        display:block;
-        border-radius:12px;
-      "
-    >
-
-    <p>
-      Nem rán is a Vietnamese traditional fried roll made from wrapper,
-      meat, vegetables, noodles, and egg.
-    </p>
-
-    <button onclick="startIntroMusic()">Make Your Nem</button>
-  `;
-}
-
-
-
-/* ================= GAME STATE ================= */
-let gameState = {
-  time: 60,
-  nem: 0,
-  target: [],
-  selected: [],
-  timer: null
-};
-
-const ingredientPool = [
-  ...groups.wrapper,
-  ...groups.protein,
-  ...groups.noodle,
-  ...groups.vegetable,
-  ...groups.others
-];
-
-
-/* ================= START GAME ================= */
-function startGame(){
-  gameState.time = 60;
-  gameState.nem = 0;
-  clearInterval(gameState.timer);
-  startTimer();
-  nextRound();
-}
-
-/* ================= TIMER ================= */
-function startTimer(){
-  gameState.timer = setInterval(()=>{
-    gameState.time--;
-    const t = document.getElementById("time");
-    if(t) t.innerText = gameState.time;
-
-    if(gameState.time <= 0){
-      clearInterval(gameState.timer);
-      gameOver();
-    }
-  },1000);
-}
-
-/* ================= NEXT ROUND ================= */
-function nextRound(){
-
-  gameState.selected = [];
-  gameState.target = generateTargetByGroup();
-
-  game.innerHTML = `
-    <div style="display:flex;justify-content:space-between">
-      <div>⏱ <span id="time">${gameState.time}</span>s</div>
-      <div>🥢 ${gameState.nem}/5</div>
-    </div>
-
-    <h2>Make Nem ${gameState.nem + 1}</h2>
-
-    <p><strong>Required ingredients (1 from each group):</strong></p>
-
-    <ul>
-      ${gameState.target.map(i =>
-        `<li>${getMaterialName(i)}</li>`
-      ).join("")}
-    </ul>
-
-    <p id="feedback" style="
-      min-height:20px;
-      margin:6px 0 10px;
-      font-weight:600;
-      color:#c00;
-    "></p>
-
-    ${renderGameGrid()}
-
-    <button onclick="checkAnswer(this)">Confirm</button>
-  `;
-}
-
-/* ================= GAME GRID ================= */
-function renderGameGrid(){
-  return `
-    <div class="grid">
-      ${ingredientPool.map(img=>`
-        <div class="item">
-          <img src="images/${img}"
-               class="choice-img"
-               onclick="toggleSelect('${img}',this)">
-          <div class="item-name">${getMaterialName(img)}</div>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-
-function toggleSelect(img, el){
-  if(gameState.selected.includes(img)){
-    gameState.selected = gameState.selected.filter(i => i !== img);
-    el.classList.remove("selected");
-  } else {
-    gameState.selected.push(img);
-    el.classList.add("selected");
-  }
-}
-
-/* ================= CHECK ANSWER ================= */
-function checkAnswer(btn){
-
-  // Disable button instantly to prevent double tap
-  if(btn){
-    btn.disabled = true;
-    btn.textContent = "Checking...";
+  function getMaterialName(filename){
+    return filename
+      .replace(".png","")
+      .replace(/-/g," ")
+      .replace(/([A-Z])/g," $1")
+      .trim();
   }
 
-  const correct =
-    gameState.target.every(i => gameState.selected.includes(i)) &&
-    gameState.selected.length === gameState.target.length;
-
-  const feedback = document.getElementById("feedback");
-
-  // ❌ WRONG ANSWER
-  if(!correct){
-    if(feedback){
-      feedback.textContent = "❌ Wrong ingredients. Try again!";
-    }
-
-    // Re-enable button and restore text
-    if(btn){
-      setTimeout(() => {
-        btn.disabled = false;
-        btn.textContent = "Confirm";
-      }, 150);
-    }
-    return;
+  function getNemImageByWrapper(wrapperImg){
+    if(wrapperImg === "Wrapper-ram.png") return "Nem-ram.png";
+    if(wrapperImg === "Wrapper-bopia.png") return "Nem-bopia.png";
+    if(wrapperImg === "Wrapper-ricepaper.png") return "Nem-ricepaper.png";
+    return "";
   }
 
-  // ✅ CORRECT ANSWER
-  if(feedback){
-    feedback.textContent = "";
-  }
-
-  gameState.nem++;
-
-  setTimeout(() => {
-    if(gameState.nem >= 5){
-      winGame();
-    }else{
-      nextRound();
-    }
-  }, 120);
-}
-
-
-/* ================= GAME END ================= */
-function winGame(){
-  clearInterval(gameState.timer);
-  game.innerHTML = `
-    <h2>🎉 Great job!</h2>
-    <p>You completed 5 Nem in time.</p>
-    <p>Do you want to build your real Nem ?</p>
-
-    <button onclick="buildNem()">🍽 Build Your Real Nem</button>
-  `;
-}
-
-function gameOver(){
-  game.innerHTML = `
-    <h2>⏰ Time’s up!</h2>
-    <p>You completed ${gameState.nem} / 5 Nem</p>
-
-    <button onclick="buildNem()">🍽 Build Real Nem</button>
-    <button onclick="startGame()">Try Again</button>
-  `;
-}
-
-/* ================= HELPER ================= */
-function randomPick(arr,n){
-  return [...arr].sort(()=>0.5-Math.random()).slice(0,n);
-}
-
-function generateTargetByGroup(){
-  const pickOne = arr => arr[Math.floor(Math.random() * arr.length)];
-
-  return [
-    pickOne(groups.wrapper),
-    pickOne(groups.protein),
-    pickOne(groups.noodle),
-    pickOne(groups.vegetable),
-    pickOne(groups.others)
+  /* ================= PERF: PRELOAD IMAGES ================= */
+  const ingredientPool = [
+    ...groups.wrapper,
+    ...groups.protein,
+    ...groups.noodle,
+    ...groups.vegetable,
+    ...groups.others
   ];
-}
 
+  function preloadImages(){
+    // Preload only once to reduce round lag
+    ingredientPool.forEach(img => {
+      const i = new Image();
+      i.decoding = 'async';
+      i.src = `images/${img}`;
+    });
+  }
 
-/* ================= VERSION 1 BUILD NEM (UNCHANGED) ================= */
-function buildNem(){
+  /* ================= LANDING ================= */
+  function landing(){
+    game.innerHTML = `
+      <h1>🧪 RollLab</h1>
+      <p>Play what you eat</p>
+      <img src="images/table-hero.png" width="100%" alt="RollLab">
 
-  // ✅ RESET USER CHOICES HERE
-  choice = {
-    wrapper: null,
-    protein: null,
-    noodle: null,
-    vegetable: null,
-    others: []
+      <button id="btn-intro">What is Nem Rán?</button>
+      <button id="btn-start">Start</button>
+    `;
+
+    document.getElementById('btn-intro')?.addEventListener('click', showIntro, {passive:true});
+    document.getElementById('btn-start')?.addEventListener('click', startIntroMusic, {passive:true});
+  }
+
+  /* ================= INTRO ================= */
+  function showIntro(){
+    game.innerHTML = `
+      <h2>How to make Nem</h2>
+
+      <img
+        src="images/how-to-make-nem.png"
+        alt="Nem Ran Introduction"
+        style="
+          width:100%;
+          max-width:320px;
+          margin:12px auto;
+          display:block;
+          border-radius:12px;
+        "
+      >
+
+      <p>
+        Nem rán is a Vietnamese traditional fried roll made from wrapper,
+        meat, vegetables, noodles, and egg.
+      </p>
+
+      <button id="btn-make">Make Your Nem</button>
+    `;
+
+    document.getElementById('btn-make')?.addEventListener('click', startIntroMusic, {passive:true});
+  }
+
+  /* ================= GAME STATE ================= */
+  let gameState = {
+    time: 60,
+    nem: 0,
+    target: [],
+    selectedSet: new Set(),
+    timer: null,
+    locked: false
   };
 
-  game.innerHTML = `
-    <h2>Choose Wrapper</h2>
-    ${renderSingle("wrapper")}
-
-    <h2>Protein</h2>
-    ${renderSingle("protein")}
-
-    <h2>Noodle</h2>
-    ${renderSingle("noodle")}
-
-    <h2>Vegetable</h2>
-    ${renderSingle("vegetable")}
-
-    <h2>Others</h2>
-    <p class="note">Choose up to 2</p>
-    ${renderOthers()}
-
-    <button onclick="placeOrder()">Confirm Nem</button>
-  `;
-}
-
-
-/* ================= RENDER ================= */
-function renderSingle(group){
-  return `
-    <div class="grid">
-      ${groups[group].map(img=>`
-        <div class="item">
-          <img src="images/${img}"
-               class="choice-img"
-               onclick="selectSingle('${group}','${img}',this)">
-          <div class="item-name">${getMaterialName(img)}</div>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-
-
-function renderOthers(){
-  return `
-    <div class="grid">
-      ${groups.others.map(img=>`
-        <div class="item">
-          <img src="images/${img}"
-               class="choice-img"
-               onclick="selectOther('${img}',this)">
-          <div class="item-name">${getMaterialName(img)}</div>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-
-/* ================= SELECTION LOGIC ================= */
-function selectSingle(group,img,el){
-  choice[group]=img;
-  document.querySelectorAll(".choice-img").forEach(i=>{
-    if(i.onclick && i.onclick.toString().includes(group)){
-      i.classList.remove("selected");
-    }
-  });
-  el.classList.add("selected");
-}
-
-function selectOther(img,el){
-  if(choice.others.includes(img)){
-    choice.others = choice.others.filter(i=>i!==img);
-    el.classList.remove("selected");
-    return;
-  }
-  if(choice.others.length>=2){
-    alert("You can choose up to 2 items only");
-    return;
-  }
-  choice.others.push(img);
-  el.classList.add("selected");
-}
-
-function submitOrder(){
-  const name = document.getElementById("order-name").value.trim();
-  const phone = document.getElementById("order-phone").value.trim();
-  const address = document.getElementById("order-address").value.trim();
-  const quantity = Number(document.getElementById("order-qty").value);
-
-  if(!name || !phone || !address){
-    alert("Please fill in all information");
-    return;
+  /* ================= START GAME ================= */
+  function startGame(){
+    gameState.time = 60;
+    gameState.nem = 0;
+    gameState.locked = false;
+    clearInterval(gameState.timer);
+    startTimer();
+    nextRound();
   }
 
-  if(quantity < 10){
-    alert("Minimum order is 10 Nem rán");
-    return;
+  /* ================= TIMER ================= */
+  function startTimer(){
+    gameState.timer = setInterval(()=>{
+      gameState.time--;
+      const t = document.getElementById("time");
+      if(t) t.innerText = String(gameState.time);
+
+      if(gameState.time <= 0){
+        clearInterval(gameState.timer);
+        gameOver();
+      }
+    }, 1000);
   }
 
-  pendingOrder = {
-    name,
-    phone,
-    address,
-    quantity,
-    wrapper: getMaterialName(choice.wrapper),
-    ingredients: [
-      choice.protein,
-      choice.noodle,
-      choice.vegetable,
-      ...choice.others
-    ].map(getMaterialName)
-  };
-
-  showOrderSummary();
-}
-
-function showOrderSummary(){
-  const o = pendingOrder;
-
-  game.innerHTML = `
-   <div class="order-summary">
-  <h2>🧾 Order Summary</h2>
-
-  <p><strong>Name:</strong> ${o.name}</p>
-  <p><strong>Phone:</strong> ${o.phone}</p>
-  <p><strong>Address:</strong> ${o.address}</p>
-  <p><strong>Quantity:</strong> ${o.quantity} Nem rán</p>
-
-  <hr>
-
-  <p><strong>Wrapper:</strong> ${o.wrapper}</p>
-  <p><strong>Ingredients:</strong></p>
-  <ul>
-    ${o.ingredients.map(i => `<li>${i}</li>`).join("")}
-  </ul>
-</div>
-
-    <hr>
-
-    <div style="
-  margin:12px 0 18px;
-  text-align:center;
-">
-  <img
-    src="images/order-guide.png"
-    alt="Screenshot & WhatsApp Guide"
-    style="
-      width:100%;
-      max-width:380px;
-      display:block;
-      margin:0 auto;
-      border-radius:18px;
-      box-shadow:0 10px 26px rgba(0,0,0,.15);
-    "
-  >
-</div>
-
-    <button onclick="contactViaWhatsApp()">📲 Contact via WhatsApp</button>
-    <button onclick="placeOrder()">✏️ Edit Order</button>
-  `;
-}
-
-/* ================= CONFIRM ================= */
-function placeOrder(){
-
-  // ✅ GUARD: must have wrapper
-  if(!choice.wrapper){
-    alert("Please build your Nem first");
-    return;
+  /* ================= TARGET GENERATION ================= */
+  function generateTargetByGroup(){
+    const pickOne = arr => arr[Math.floor(Math.random() * arr.length)];
+    return [
+      pickOne(groups.wrapper),
+      pickOne(groups.protein),
+      pickOne(groups.noodle),
+      pickOne(groups.vegetable),
+      pickOne(groups.others)
+    ];
   }
 
-  const nemImg = choice.wrapper
-    ? getNemImageByWrapper(choice.wrapper)
-    : "";
-
-  game.innerHTML = `
-    <h2>📝 Order Your Nem Rán</h2>
-
-    <input id="order-name" placeholder="Full name">
-    <input id="order-phone" placeholder="Phone number">
-    <textarea id="order-address" placeholder="Delivery address"></textarea>
-    <input id="order-qty" type="number" min="10" placeholder="Quantity (min 10)">
-
-    <button onclick="submitOrder()">Place Order</button>
-
-    ${nemImg ? `
-      <div style="margin-top:16px;text-align:center;">
-        <img src="images/${nemImg}" style="max-width:260px;">
-        <p><strong>Your Nem</strong></p>
+  /* ================= GAME GRID (NO INLINE ONCLICK) ================= */
+  function renderGameGrid(){
+    return `
+      <div class="grid" id="grid">
+        ${ingredientPool.map(img => `
+          <div class="item">
+            <img
+              src="images/${img}"
+              class="choice-img"
+              data-img="${img}"
+              alt="${getMaterialName(img)}"
+              decoding="async"
+            >
+            <div class="item-name">${getMaterialName(img)}</div>
+          </div>
+        `).join("")}
       </div>
-    ` : ""}
-  `;
-}
+    `;
+  }
 
-function contactViaWhatsApp(){
-  const o = pendingOrder;
+  function setLocked(locked){
+    gameState.locked = locked;
+    document.querySelectorAll('.choice-img').forEach(el => {
+      el.classList.toggle('locked', locked);
+    });
+  }
 
-  const message = `
+  function clearSelections(){
+    gameState.selectedSet.clear();
+    document.querySelectorAll('.choice-img.selected').forEach(el => el.classList.remove('selected'));
+  }
+
+  function updateFeedback(type, text){
+    const fb = document.getElementById('feedback');
+    if(!fb) return;
+    fb.classList.remove('ok','bad');
+    if(type) fb.classList.add(type);
+    fb.textContent = text || '';
+  }
+
+  /* ================= AUTO-CHECK ROUND ================= */
+  function evaluateRound(){
+    const selected = gameState.selectedSet;
+    const correct =
+      gameState.target.every(i => selected.has(i)) &&
+      selected.size === gameState.target.length;
+
+    setLocked(true);
+
+    if(!correct){
+      updateFeedback('bad', '❌ Wrong');
+      // Auto reset so player can try again without tapping confirm
+      setTimeout(() => {
+        updateFeedback('', '');
+        clearSelections();
+        setLocked(false);
+      }, 600);
+      return;
+    }
+
+    updateFeedback('ok', '✅ Correct');
+    gameState.nem++;
+
+    setTimeout(() => {
+      if(gameState.nem >= 5){
+        winGame();
+      } else {
+        nextRound();
+      }
+    }, 650);
+  }
+
+  function onGridClick(e){
+    if(gameState.locked) return;
+
+    const imgEl = e.target?.closest?.('.choice-img');
+    if(!imgEl) return;
+
+    const img = imgEl.getAttribute('data-img');
+    if(!img) return;
+
+    // Prevent selecting more than needed (5)
+    if(!gameState.selectedSet.has(img) && gameState.selectedSet.size >= gameState.target.length){
+      return;
+    }
+
+    if(gameState.selectedSet.has(img)){
+      gameState.selectedSet.delete(img);
+      imgEl.classList.remove('selected');
+      updateFeedback('', '');
+    } else {
+      gameState.selectedSet.add(img);
+      imgEl.classList.add('selected');
+      // Auto-check when player has selected enough items
+      if(gameState.selectedSet.size === gameState.target.length){
+        // Next tick for smoother visual feedback
+        requestAnimationFrame(evaluateRound);
+      }
+    }
+  }
+
+  /* ================= NEXT ROUND ================= */
+  function nextRound(){
+    gameState.selectedSet = new Set();
+    gameState.target = generateTargetByGroup();
+    gameState.locked = false;
+
+    game.innerHTML = `
+      <div style="display:flex;justify-content:space-between">
+        <div>⏱ <span id="time">${gameState.time}</span>s</div>
+        <div>🥢 ${gameState.nem}/5</div>
+      </div>
+
+      <h2>Make Nem ${gameState.nem + 1}</h2>
+
+      <p><strong>Required ingredients (1 from each group):</strong></p>
+
+      <ul>
+        ${gameState.target.map(i => `<li>${getMaterialName(i)}</li>`).join("")}
+      </ul>
+
+      <p id="feedback"></p>
+
+      <p class="note">Chọn đủ 5 nguyên liệu để hệ thống tự kiểm tra.</p>
+
+      ${renderGameGrid()}
+    `;
+
+    const grid = document.getElementById('grid');
+    // Rebind fresh listener for this round (grid recreated)
+    grid?.addEventListener('click', onGridClick, {passive:true});
+  }
+
+  /* ================= GAME END ================= */
+  function winGame(){
+    clearInterval(gameState.timer);
+    game.innerHTML = `
+      <h2>🎉 Great job!</h2>
+      <p>You completed 5 Nem in time.</p>
+      <p>Do you want to build your real Nem ?</p>
+
+      <button id="btn-build">🍽 Build Your Real Nem</button>
+    `;
+    document.getElementById('btn-build')?.addEventListener('click', buildNem, {passive:true});
+  }
+
+  function gameOver(){
+    game.innerHTML = `
+      <h2>⏰ Time’s up!</h2>
+      <p>You completed ${gameState.nem} / 5 Nem</p>
+
+      <button id="btn-build">🍽 Build Real Nem</button>
+      <button id="btn-retry">Try Again</button>
+    `;
+    document.getElementById('btn-build')?.addEventListener('click', buildNem, {passive:true});
+    document.getElementById('btn-retry')?.addEventListener('click', startGame, {passive:true});
+  }
+
+  /* ================= BUILD NEM (UNCHANGED LOGIC, LIGHT OPT) ================= */
+  function buildNem(){
+    choice = { wrapper:null, protein:null, noodle:null, vegetable:null, others:[] };
+
+    game.innerHTML = `
+      <h2>Choose Wrapper</h2>
+      ${renderSingle('wrapper')}
+
+      <h2>Protein</h2>
+      ${renderSingle('protein')}
+
+      <h2>Noodle</h2>
+      ${renderSingle('noodle')}
+
+      <h2>Vegetable</h2>
+      ${renderSingle('vegetable')}
+
+      <h2>Others</h2>
+      <p class="note">Choose up to 2</p>
+      ${renderOthers()}
+
+      <button id="btn-confirm-nem">Confirm Nem</button>
+    `;
+
+    document.getElementById('btn-confirm-nem')?.addEventListener('click', placeOrder, {passive:true});
+  }
+
+  function renderSingle(group){
+    return `
+      <div class="grid" data-group="${group}">
+        ${groups[group].map(img => `
+          <div class="item">
+            <img src="images/${img}"
+                 class="choice-img"
+                 data-single-group="${group}"
+                 data-img="${img}"
+                 alt="${getMaterialName(img)}"
+                 decoding="async">
+            <div class="item-name">${getMaterialName(img)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderOthers(){
+    return `
+      <div class="grid" data-group="others">
+        ${groups.others.map(img => `
+          <div class="item">
+            <img src="images/${img}"
+                 class="choice-img"
+                 data-other="true"
+                 data-img="${img}"
+                 alt="${getMaterialName(img)}"
+                 decoding="async">
+            <div class="item-name">${getMaterialName(img)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // Event delegation for buildNem selections
+  game.addEventListener('click', (e) => {
+    const imgEl = e.target?.closest?.('.choice-img');
+    if(!imgEl) return;
+
+    const img = imgEl.getAttribute('data-img');
+    if(!img) return;
+
+    const group = imgEl.getAttribute('data-single-group');
+    const isOther = imgEl.getAttribute('data-other') === 'true';
+
+    if(group){
+      choice[group] = img;
+      // Only clear selection inside the same single group
+      document.querySelectorAll(`.choice-img[data-single-group="${group}"]`).forEach(el => el.classList.remove('selected'));
+      imgEl.classList.add('selected');
+      return;
+    }
+
+    if(isOther){
+      if(choice.others.includes(img)){
+        choice.others = choice.others.filter(i => i !== img);
+        imgEl.classList.remove('selected');
+        return;
+      }
+      if(choice.others.length >= 2){
+        alert('You can choose up to 2 items only');
+        return;
+      }
+      choice.others.push(img);
+      imgEl.classList.add('selected');
+    }
+  }, {passive:true});
+
+  function submitOrder(){
+    const name = document.getElementById('order-name')?.value.trim();
+    const phone = document.getElementById('order-phone')?.value.trim();
+    const address = document.getElementById('order-address')?.value.trim();
+    const quantity = Number(document.getElementById('order-qty')?.value);
+
+    if(!name || !phone || !address){
+      alert('Please fill in all information');
+      return;
+    }
+
+    if(quantity < 10){
+      alert('Minimum order is 10 Nem rán');
+      return;
+    }
+
+    pendingOrder = {
+      name,
+      phone,
+      address,
+      quantity,
+      wrapper: getMaterialName(choice.wrapper),
+      ingredients: [
+        choice.protein,
+        choice.noodle,
+        choice.vegetable,
+        ...choice.others
+      ].filter(Boolean).map(getMaterialName)
+    };
+
+    showOrderSummary();
+  }
+
+  function showOrderSummary(){
+    const o = pendingOrder;
+
+    game.innerHTML = `
+      <div class="order-summary">
+        <h2>🧾 Order Summary</h2>
+
+        <p><strong>Name:</strong> ${o.name}</p>
+        <p><strong>Phone:</strong> ${o.phone}</p>
+        <p><strong>Address:</strong> ${o.address}</p>
+        <p><strong>Quantity:</strong> ${o.quantity} Nem rán</p>
+
+        <hr>
+
+        <p><strong>Wrapper:</strong> ${o.wrapper}</p>
+        <p><strong>Ingredients:</strong></p>
+        <ul>
+          ${o.ingredients.map(i => `<li>${i}</li>`).join('')}
+        </ul>
+      </div>
+
+      <hr>
+
+      <div style="margin:12px 0 18px;text-align:center;">
+        <img
+          src="images/order-guide.png"
+          alt="Screenshot & WhatsApp Guide"
+          style="
+            width:100%;
+            max-width:380px;
+            display:block;
+            margin:0 auto;
+            border-radius:18px;
+            box-shadow:0 10px 26px rgba(0,0,0,.15);
+          "
+        >
+      </div>
+
+      <button id="btn-wa">📲 Contact via WhatsApp</button>
+      <button id="btn-edit">✏️ Edit Order</button>
+    `;
+
+    document.getElementById('btn-wa')?.addEventListener('click', contactViaWhatsApp, {passive:true});
+    document.getElementById('btn-edit')?.addEventListener('click', placeOrder, {passive:true});
+  }
+
+  function placeOrder(){
+    if(!choice.wrapper){
+      alert('Please build your Nem first');
+      return;
+    }
+
+    const nemImg = choice.wrapper ? getNemImageByWrapper(choice.wrapper) : '';
+
+    game.innerHTML = `
+      <h2>📝 Order Your Nem Rán</h2>
+
+      <input id="order-name" placeholder="Full name">
+      <input id="order-phone" placeholder="Phone number">
+      <textarea id="order-address" placeholder="Delivery address"></textarea>
+      <input id="order-qty" type="number" min="10" placeholder="Quantity (min 10)">
+
+      <button id="btn-place">Place Order</button>
+
+      ${nemImg ? `
+        <div style="margin-top:16px;text-align:center;">
+          <img src="images/${nemImg}" style="max-width:260px;" alt="Your Nem" decoding="async">
+          <p><strong>Your Nem</strong></p>
+        </div>
+      ` : ''}
+    `;
+
+    document.getElementById('btn-place')?.addEventListener('click', submitOrder, {passive:true});
+  }
+
+  function contactViaWhatsApp(){
+    const o = pendingOrder;
+
+    const message = `
 🧪 RollLab – Nem Rán Order
 
 👤 Name: ${o.name}
@@ -611,41 +636,32 @@ function contactViaWhatsApp(){
 🍽 Order:
 • Quantity: ${o.quantity}
 • Wrapper: ${o.wrapper}
-• Ingredients: ${o.ingredients.join(", ")}
+• Ingredients: ${o.ingredients.join(', ')}
 
 📸 I have attached the screenshot of my order.
 `;
 
-  const phoneNumber = "60168535693"; 
-
-
-  const url =
-    "https://wa.me/" +
-    phoneNumber +
-    "?text=" +
-    encodeURIComponent(message);
-
-  window.open(url, "_blank");
-}
-
-/* ================= START ================= */
-
-const bgMusic = document.getElementById("bg-music");
-
-function playMusic(){
-  if(bgMusic){
-    bgMusic.volume = 0.4;
-    bgMusic.play().catch(()=>{});
+    const phoneNumber = '60168535693';
+    const url = 'https://wa.me/' + phoneNumber + '?text=' + encodeURIComponent(message);
+    window.open(url, '_blank');
   }
-}
-function startIntroMusic(){
-  playMusic();   // 🎵 start music here
-  startGame();   // continue flow
-}
 
-landing();
+  /* ================= MUSIC ================= */
+  const bgMusic = document.getElementById('bg-music');
+  function playMusic(){
+    if(bgMusic){
+      bgMusic.volume = 0.4;
+      bgMusic.play().catch(()=>{});
+    }
+  }
+  function startIntroMusic(){
+    playMusic();
+    startGame();
+  }
 
-</script> 
-
+  /* ================= START ================= */
+  preloadImages();
+  landing();
+</script>
 </body>
 </html>
