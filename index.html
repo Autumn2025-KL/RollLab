@@ -120,6 +120,18 @@
   /* ================= DATA ================= */
   let pendingOrder = null;
 
+  // Persist form values so players don't need to retype after "Edit Order"
+  let orderForm = { name:'', phone:'', address:'', quantity:'' };
+
+  function escapeHtml(str){
+    return String(str ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+
   const groups = {
     wrapper: ["Wrapper-ram.png","Wrapper-bopia.png","Wrapper-ricepaper.png"],
     protein: ["Chicken.png","Pork.png","Oyster-mushroom.png"],
@@ -418,8 +430,44 @@
     document.getElementById('btn-retry')?.addEventListener('click', startGame, {passive:true});
   }
 
-  /* ================= BUILD NEM (UNCHANGED LOGIC, LIGHT OPT) ================= */
+  /* ================= BUILD NEM (AUTO ADVANCE) ================= */
+  // Note: auto-advance happens AFTER a short idle time so players can still pick "Others".
+  let buildAuto = { active:false, timeoutId:null };
+
+  function clearBuildAutoTimer(){
+    if(buildAuto.timeoutId){
+      clearTimeout(buildAuto.timeoutId);
+      buildAuto.timeoutId = null;
+    }
+  }
+
+  function scheduleAutoAdvanceToOrder(){
+    if(!buildAuto.active) return;
+
+    const ready = !!(choice.wrapper && choice.protein && choice.noodle && choice.vegetable);
+    if(!ready) {
+      clearBuildAutoTimer();
+      return;
+    }
+
+    // If user already picked 2 "Others", advance immediately.
+    if((choice.others || []).length >= 2){
+      clearBuildAutoTimer();
+      placeOrder();
+      return;
+    }
+
+    // Otherwise wait a bit (idle) so user can optionally pick Others.
+    clearBuildAutoTimer();
+    buildAuto.timeoutId = setTimeout(() => {
+      if(buildAuto.active) placeOrder();
+    }, 16000);
+  }
+
   function buildNem(){
+    buildAuto.active = true;
+    clearBuildAutoTimer();
+
     choice = { wrapper:null, protein:null, noodle:null, vegetable:null, others:[] };
 
     game.innerHTML = `
@@ -438,11 +486,7 @@
       <h2>Others</h2>
       <p class="note">Choose up to 2</p>
       ${renderOthers()}
-
-      <button id="btn-confirm-nem">Confirm Nem</button>
     `;
-
-    document.getElementById('btn-confirm-nem')?.addEventListener('click', placeOrder, {passive:true});
   }
 
   function renderSingle(group){
@@ -497,6 +541,7 @@
       // Only clear selection inside the same single group
       document.querySelectorAll(`.choice-img[data-single-group="${group}"]`).forEach(el => el.classList.remove('selected'));
       imgEl.classList.add('selected');
+      scheduleAutoAdvanceToOrder();
       return;
     }
 
@@ -512,6 +557,7 @@
       }
       choice.others.push(img);
       imgEl.classList.add('selected');
+      scheduleAutoAdvanceToOrder();
     }
   }, {passive:true});
 
@@ -520,6 +566,14 @@
     const phone = document.getElementById('order-phone')?.value.trim();
     const address = document.getElementById('order-address')?.value.trim();
     const quantity = Number(document.getElementById('order-qty')?.value);
+
+    // Save latest form values (so Edit Order can reuse them)
+    orderForm = {
+      name: name || '',
+      phone: phone || '',
+      address: address || '',
+      quantity: Number.isFinite(quantity) ? String(quantity) : ''
+    };
 
     if(!name || !phone || !address){
       alert('Please fill in all information');
@@ -591,10 +645,14 @@
     `;
 
     document.getElementById('btn-wa')?.addEventListener('click', contactViaWhatsApp, {passive:true});
-    document.getElementById('btn-edit')?.addEventListener('click', placeOrder, {passive:true});
+    document.getElementById('btn-edit')?.addEventListener('click', buildNem, {passive:true});
   }
 
   function placeOrder(){
+    // Leaving build screen (stop auto-advance)
+    buildAuto.active = false;
+    clearBuildAutoTimer();
+
     if(!choice.wrapper){
       alert('Please build your Nem first');
       return;
@@ -605,10 +663,10 @@
     game.innerHTML = `
       <h2>📝 Order Your Nem Rán</h2>
 
-      <input id="order-name" placeholder="Full name">
-      <input id="order-phone" placeholder="Phone number">
-      <textarea id="order-address" placeholder="Delivery address"></textarea>
-      <input id="order-qty" type="number" min="10" placeholder="Quantity (min 10)">
+      <input id="order-name" placeholder="Full name" value="${escapeHtml(orderForm.name)}">
+      <input id="order-phone" placeholder="Phone number" value="${escapeHtml(orderForm.phone)}">
+      <textarea id="order-address" placeholder="Delivery address">${escapeHtml(orderForm.address)}</textarea>
+      <input id="order-qty" type="number" min="10" placeholder="Quantity (min 10)" value="${escapeHtml(orderForm.quantity)}">
 
       <button id="btn-place">Place Order</button>
 
